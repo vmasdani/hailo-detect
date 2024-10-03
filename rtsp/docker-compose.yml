@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  rtsp-server:
+    image: bluenviron/mediamtx
+    container_name: rtsp-server
+    environment:
+      - MTX_PROTOCOLS=tcp
+      - MTX_WEBRTCADDITIONALHOSTS=192.168.x.x
+    ports:
+      - "8554:8554"
+      - "1935:1935"
+      - "8888:8888"
+      - "8889:8889"
+      - "8890:8890/udp"
+      - "8189:8189/udp"
+
+  cam1:
+    build: .
+    container_name: cam1
+    command: ffmpeg -re -stream_loop -1 -i /videos/test.mp4 -c copy -f rtsp rtsp://172.17.0.1:8554/cam1
+    volumes:
+      - ./videos/cam1.mp4:/videos/test.mp4
+    depends_on:
+      - rtsp-server
+
+  cam2:
+    build: .
+    container_name: cam2
+    command: ffmpeg -re -stream_loop -1 -i /videos/test.mp4 -c copy -f rtsp rtsp://172.17.0.1:8554/cam2
+    volumes:
+      - ./videos/cam2.mp4:/videos/test.mp4
+    depends_on:
+      - rtsp-server
+
+  cam3:
+    build: .
+    container_name: cam3
+    command: ffmpeg -re -stream_loop -1 -i /videos/test.mp4 -c copy -f rtsp rtsp://172.17.0.1:8554/cam3
+    volumes:
+      - ./videos/cam3.mp4:/videos/test.mp4
+    depends_on:
+      - rtsp-server
+
+
+  cam4:
+    build: .
+    container_name: cam4
+    command: ffmpeg -re -stream_loop -1 -i /videos/test.mp4 -c copy -f rtsp rtsp://172.17.0.1:8554/cam4
+    volumes:
+      - ./videos/cam4.mp4:/videos/test.mp4
+    depends_on:
+      - rtsp-server
+
+  cam-aggregate:
+    build: .
+    container_name: cam-aggregate
+    depends_on:
+      - cam1
+      - cam2
+      - cam3
+      - cam4
+    command: >
+      ffmpeg 
+      -i rtsp://172.17.0.1:8554/cam1 
+      -i rtsp://172.17.0.1:8554/cam2 
+      -i rtsp://172.17.0.1:8554/cam3 
+      -i rtsp://172.17.0.1:8554/cam4 
+      -filter_complex "nullsrc=size=1280x720 [base]; [0:v] setpts=PTS-STARTPTS, scale=640x360 [upperleft]; [1:v] setpts=PTS-STARTPTS, scale=640x360 [upperright]; [2:v] setpts=PTS-STARTPTS, scale=640x360 [lowerleft]; [3:v] setpts=PTS-STARTPTS, scale=640x360 [lowerright]; [base][upperleft] overlay=shortest=1 [tmp1]; [tmp1][upperright] overlay=shortest=1:x=640 [tmp2]; [tmp2][lowerleft] overlay=shortest=1:y=360 [tmp3]; [tmp3][lowerright] overlay=shortest=1:x=640:y=360" 
+      -c:v libx264 
+      -f rtsp rtsp://172.17.0.1:8554/aggregate
